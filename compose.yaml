@@ -1,0 +1,18 @@
+# compose.yaml
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: stockalert_db
+    environment:
+      POSTGRES_DB: stockalert
+      POSTGRES_USER: stockalert_user
+      POSTGRES_PASSWORD: stockalert_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d
+      #ejecuta directamente todos los sql de mi carpeta db 
+      #solo se ejecuta una vez la si esta vacia 
+
+
+# alphine es contenedor que usa alphine Linux mas rapido

@@ -1,0 +1,123 @@
+openapi: 3.0.3
+info:
+  title: API didáctica de reservas
+  version: 1.0.0
+  description: Contrato HTTP del ejemplo usado en la semana 5.
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/reservations:
+    get:
+      operationId: listReservations
+      summary: Consultar las reservas
+      responses:
+        '200':
+          description: Reservas ordenadas por fecha de inicio.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Reservation'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createReservation
+      summary: Crear una reserva
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReservation'
+      responses:
+        '201':
+          description: Reserva creada.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Reservation'
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Comprobar que la API responde
+      responses:
+        '200':
+          description: Proceso HTTP activo.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+components:
+  schemas:
+    CreateReservation:
+      type: object
+      additionalProperties: false
+      required: [customerName, resourceName, startsAt, endsAt]
+      properties:
+        customerName:
+          type: string
+          minLength: 1
+          maxLength: 160
+          example: Ana Pérez
+        resourceName:
+          type: string
+          minLength: 1
+          maxLength: 160
+          example: Sala A
+        startsAt:
+          type: string
+          format: date-time
+          example: '2026-11-10T14:00:00-05:00'
+        endsAt:
+          type: string
+          format: date-time
+          example: '2026-11-10T15:00:00-05:00'
+    Reservation:
+      allOf:
+        - $ref: '#/components/schemas/CreateReservation'
+        - type: object
+          required: [id, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            createdAt:
+              type: string
+              format: date-time
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+  responses:
+    InvalidInput:
+      description: Solicitud que no cumple el contrato o las reglas del intervalo.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Error interno no expuesto al consumidor.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
