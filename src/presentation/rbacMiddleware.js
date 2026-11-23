@@ -1,10 +1,9 @@
-import { NextFunction, Request, Response } from 'express';
-import { PostgresStockRepository } from '../persistence/PostgresStockRepository';
+const { ROLES } = require('../domain/models');
 
-export function exigirRolAdmin(repo: PostgresStockRepository) {
-  return async (req: Request, res: Response, next: NextFunction) => {
+function exigirRolAdmin(repo) {
+  return async (req, res, next) => {
     const rol = (req.header('x-user-role') || 'ANONIMO').toUpperCase();
-    if (rol !== 'ADMIN') {
+    if (rol !== ROLES.ADMIN) {
       await repo.registrarAuditoria(
         rol,
         req.originalUrl,
@@ -19,3 +18,5 @@ export function exigirRolAdmin(repo: PostgresStockRepository) {
     next();
   };
 }
+
+module.exports = { exigirRolAdmin };

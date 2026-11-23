@@ -1,21 +1,16 @@
-import { Request, Response } from 'express';
-import { ConsultarHistorialService } from '../application/ConsultarHistorialService';
-import { EvaluarAlertasService } from '../application/EvaluarAlertasService';
-import { RegistrarLoteService } from '../application/RegistrarLoteService';
-import { RegistrarSalidaService } from '../application/RegistrarSalidaService';
-import { LoteVencidoError, StockInsuficienteError, ValidacionError } from '../domain/errors';
-import { PostgresStockRepository } from '../persistence/PostgresStockRepository';
+const { LoteVencidoError, StockInsuficienteError, ValidacionError } = require('../domain/errors');
+const { ROLES } = require('../domain/models');
 
-export class StockAlertController {
-  constructor(
-    private readonly alertasService: EvaluarAlertasService,
-    private readonly salidaService: RegistrarSalidaService,
-    private readonly loteService: RegistrarLoteService,
-    private readonly historialService: ConsultarHistorialService,
-    private readonly repo: PostgresStockRepository
-  ) {}
+class StockAlertController {
+  constructor(alertasService, salidaService, loteService, historialService, repo) {
+    this.alertasService = alertasService;
+    this.salidaService = salidaService;
+    this.loteService = loteService;
+    this.historialService = historialService;
+    this.repo = repo;
+  }
 
-  obtenerAlertas = async (_req: Request, res: Response) => {
+  obtenerAlertas = async (_req, res) => {
     try {
       const alertas = await this.alertasService.ejecutar();
       res.status(200).json({ total: alertas.length, alertas });
@@ -24,9 +19,9 @@ export class StockAlertController {
     }
   };
 
-  registrarLote = async (req: Request, res: Response) => {
+  registrarLote = async (req, res) => {
     try {
-      const rol = (req.header('x-user-role') || 'ENCARGADO').toUpperCase();
+      const rol = (req.header('x-user-role') || ROLES.ENCARGADO).toUpperCase();
       const lote = await this.loteService.ejecutar({ ...req.body, usuarioRol: rol });
       res.status(201).json(lote);
     } catch (err) {
@@ -34,9 +29,9 @@ export class StockAlertController {
     }
   };
 
-  registrarSalida = async (req: Request, res: Response) => {
+  registrarSalida = async (req, res) => {
     try {
-      const rol = (req.header('x-user-role') || 'ENCARGADO').toUpperCase();
+      const rol = (req.header('x-user-role') || ROLES.ENCARGADO).toUpperCase();
       const lote = await this.salidaService.registrarVentaFEFO({ ...req.body, usuarioRol: rol });
       res.status(201).json({ mensaje: 'Salida registrada bajo criterio FEFO', lote });
     } catch (err) {
@@ -44,9 +39,9 @@ export class StockAlertController {
     }
   };
 
-  registrarMerma = async (req: Request, res: Response) => {
+  registrarMerma = async (req, res) => {
     try {
-      const rol = (req.header('x-user-role') || 'ADMIN').toUpperCase();
+      const rol = (req.header('x-user-role') || ROLES.ADMIN).toUpperCase();
       const lote = await this.salidaService.registrarMerma({ ...req.body, usuarioRol: rol });
       res.status(201).json({ mensaje: 'Merma registrada', lote });
     } catch (err) {
@@ -54,7 +49,7 @@ export class StockAlertController {
     }
   };
 
-  actualizarUmbral = async (req: Request, res: Response) => {
+  actualizarUmbral = async (req, res) => {
     try {
       const productoId = Number(req.params.id);
       const { stockMinimo, diasPreaviso } = req.body;
@@ -72,10 +67,9 @@ export class StockAlertController {
     }
   };
 
-  consultarMovimientos = async (req: Request, res: Response) => {
+  consultarMovimientos = async (req, res) => {
     try {
-      const desde = req.query.desde as string | undefined;
-      const hasta = req.query.hasta as string | undefined;
+      const { desde, hasta } = req.query;
       const movimientos = await this.historialService.ejecutar(desde, hasta);
       res.status(200).json({ total: movimientos.length, movimientos });
     } catch (err) {
@@ -83,7 +77,7 @@ export class StockAlertController {
     }
   };
 
-  private manejarError(err: unknown, res: Response) {
+  manejarError(err, res) {
     if (err instanceof ValidacionError) {
       res.status(400).json({ error: err.message });
       return;
@@ -100,3 +94,5 @@ export class StockAlertController {
     res.status(500).json({ error: 'Error interno del servidor.' });
   }
 }
+
+module.exports = { StockAlertController };

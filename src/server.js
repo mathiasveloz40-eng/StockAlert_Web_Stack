@@ -1,5 +1,4 @@
-// src/server.ts
-import { createApp } from './app';
+const { createApp } = require('./app');
 
 const PORT = Number(process.env.PORT || 3000);
 const app = createApp();

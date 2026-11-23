@@ -1,10 +1,9 @@
-import { Pool } from 'pg';
-import { Lote, LoteConProducto, Movimiento } from '../domain/models';
+class PostgresStockRepository {
+  constructor(db) {
+    this.db = db;
+  }
 
-export class PostgresStockRepository {
-  constructor(private readonly db: Pool) {}
-
-  async obtenerLotesConProducto(): Promise<LoteConProducto[]> {
+  async obtenerLotesConProducto() {
     const res = await this.db.query(`
       SELECT
         l.id,
@@ -23,13 +22,7 @@ export class PostgresStockRepository {
     return res.rows;
   }
 
-  async crearLote(data: {
-    productoId: number;
-    codigoLote: string;
-    cantidad: number;
-    fechaVencimiento: string | null;
-    usuarioRol: string;
-  }): Promise<Lote> {
+  async crearLote({ productoId, codigoLote, cantidad, fechaVencimiento, usuarioRol }) {
     const client = await this.db.connect();
     try {
       await client.query('BEGIN');
@@ -38,14 +31,14 @@ export class PostgresStockRepository {
          VALUES ($1, $2, $3, $4)
          RETURNING id, producto_id AS "productoId", codigo_lote AS "codigoLote",
                    saldo, TO_CHAR(fecha_vencimiento, 'YYYY-MM-DD') AS "fechaVencimiento"`,
-        [data.productoId, data.codigoLote, data.cantidad, data.fechaVencimiento]
+        [productoId, codigoLote, cantidad, fechaVencimiento]
       );
       const lote = loteRes.rows[0];
 
       await client.query(
         `INSERT INTO movimientos (lote_id, tipo, cantidad, motivo, usuario_rol)
          VALUES ($1, 'INGRESO', $2, 'Ingreso de mercadería', $3)`,
-        [lote.id, data.cantidad, data.usuarioRol]
+        [lote.id, cantidad, usuarioRol]
       );
       await client.query('COMMIT');
       return lote;
@@ -57,8 +50,7 @@ export class PostgresStockRepository {
     }
   }
 
-  // Criterio FEFO: obtiene lotes activos vigentes ordenados por vencimiento más próximo
-  async obtenerLotesDisponiblesFEFO(productoId: number): Promise<Lote[]> {
+  async obtenerLotesDisponiblesFEFO(productoId) {
     const res = await this.db.query(
       `SELECT id, producto_id AS "productoId", codigo_lote AS "codigoLote",
               saldo, TO_CHAR(fecha_vencimiento, 'YYYY-MM-DD') AS "fechaVencimiento"
@@ -72,14 +64,7 @@ export class PostgresStockRepository {
     return res.rows;
   }
 
-  // Resolución T-01 / QA-01: actualización atómica condicional sin saldos negativos
-  async descontarLoteAtomico(data: {
-    loteId: number;
-    cantidad: number;
-    tipo: 'VENTA' | 'MERMA';
-    motivo: string;
-    usuarioRol: string;
-  }): Promise<Lote | null> {
+  async descontarLoteAtomico({ loteId, cantidad, tipo, motivo, usuarioRol }) {
     const client = await this.db.connect();
     try {
       await client.query('BEGIN');
@@ -89,7 +74,7 @@ export class PostgresStockRepository {
          WHERE id = $2 AND saldo >= $1
          RETURNING id, producto_id AS "productoId", codigo_lote AS "codigoLote",
                    saldo, TO_CHAR(fecha_vencimiento, 'YYYY-MM-DD') AS "fechaVencimiento"`,
-        [data.cantidad, data.loteId]
+        [cantidad, loteId]
       );
 
       if (updateRes.rowCount === 0) {
@@ -100,7 +85,7 @@ export class PostgresStockRepository {
       await client.query(
         `INSERT INTO movimientos (lote_id, tipo, cantidad, motivo, usuario_rol)
          VALUES ($1, $2, $3, $4, $5)`,
-        [data.loteId, data.tipo, data.cantidad, data.motivo, data.usuarioRol]
+        [loteId, tipo, cantidad, motivo, usuarioRol]
       );
 
       await client.query('COMMIT');
@@ -113,19 +98,15 @@ export class PostgresStockRepository {
     }
   }
 
-  async actualizarUmbralProducto(
-    productoId: number,
-    stockMinimo: number,
-    diasPreaviso: number
-  ): Promise<boolean> {
+  async actualizarUmbralProducto(productoId, stockMinimo, diasPreaviso) {
     const res = await this.db.query(
       `UPDATE productos SET stock_minimo = $1, dias_preaviso = $2 WHERE id = $3`,
       [stockMinimo, diasPreaviso, productoId]
     );
-    return (res.rowCount ?? 0) > 0;
+    return (res.rowCount || 0) > 0;
   }
 
-  async consultarMovimientos(desde?: string, hasta?: string): Promise<Movimiento[]> {
+  async consultarMovimientos(desde, hasta) {
     const res = await this.db.query(
       `SELECT id, lote_id AS "loteId", tipo, cantidad, motivo,
               usuario_rol AS "usuarioRol", fecha
@@ -138,12 +119,7 @@ export class PostgresStockRepository {
     return res.rows;
   }
 
-  async registrarAuditoria(
-    usuarioRol: string,
-    endpoint: string,
-    metodo: string,
-    detalle: string
-  ): Promise<void> {
+  async registrarAuditoria(usuarioRol, endpoint, metodo, detalle) {
     await this.db.query(
       `INSERT INTO auditoria (usuario_rol, endpoint, metodo, detalle)
        VALUES ($1, $2, $3, $4)`,
@@ -151,3 +127,5 @@ export class PostgresStockRepository {
     );
   }
 }
+
+module.exports = { PostgresStockRepository };

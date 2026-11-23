@@ -1,32 +1,32 @@
-import { AlertaLote, EstadoAlerta, LoteConProducto } from '../domain/models';
-import { PostgresStockRepository } from '../persistence/PostgresStockRepository';
+const { ESTADOS_ALERTA } = require('../domain/models');
 
-export class EvaluarAlertasService {
-  constructor(private readonly repo: PostgresStockRepository) {}
+class EvaluarAlertasService {
+  constructor(repo) {
+    this.repo = repo;
+  }
 
-  async ejecutar(fechaReferencia = new Date()): Promise<AlertaLote[]> {
+  async ejecutar(fechaReferencia = new Date()) {
     const lotes = await this.repo.obtenerLotesConProducto();
     return lotes.map((lote) => this.clasificarLote(lote, fechaReferencia));
   }
 
-  // Función pura aislada del SQL (resuelve T-03 / QA-05)
-  clasificarLote(lote: LoteConProducto, hoy: Date): AlertaLote {
-    let estado: EstadoAlerta = 'NORMAL';
-    let diasRestantes: number | null = null;
+  clasificarLote(lote, hoy) {
+    let estado = ESTADOS_ALERTA.NORMAL;
+    let diasRestantes = null;
 
     if (!lote.fechaVencimiento || lote.diasPreaviso === null || lote.stockMinimo === null) {
-      estado = 'INDETERMINADO'; // Regla R-02 y QA-06
+      estado = ESTADOS_ALERTA.INDETERMINADO;
     } else {
       const vencimiento = new Date(`${lote.fechaVencimiento}T00:00:00Z`);
       const inicioHoy = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate()));
       diasRestantes = Math.floor((vencimiento.getTime() - inicioHoy.getTime()) / 86400000);
 
       if (diasRestantes < 0) {
-        estado = 'VENCIDO';
+        estado = ESTADOS_ALERTA.VENCIDO;
       } else if (diasRestantes <= lote.diasPreaviso) {
-        estado = 'POR_VENCER';
+        estado = ESTADOS_ALERTA.POR_VENCER;
       } else if (lote.saldo <= lote.stockMinimo) {
-        estado = 'STOCK_CRITICO';
+        estado = ESTADOS_ALERTA.STOCK_CRITICO;
       }
     }
 
@@ -42,3 +42,5 @@ export class EvaluarAlertasService {
     };
   }
 }
+
+module.exports = { EvaluarAlertasService };

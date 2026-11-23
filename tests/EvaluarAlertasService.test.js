@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { EvaluarAlertasService } from '../src/application/EvaluarAlertasService';
+const { EvaluarAlertasService } = require('../src/application/EvaluarAlertasService');
 
 describe('EvaluarAlertasService (CU-01 / QA-06)', () => {
-  const service = new EvaluarAlertasService({} as any);
+  const service = new EvaluarAlertasService({});
   const hoy = new Date('2026-11-20T00:00:00Z');
 
   it('marca como INDETERMINADO un lote sin fecha de vencimiento (R-02)', () => {

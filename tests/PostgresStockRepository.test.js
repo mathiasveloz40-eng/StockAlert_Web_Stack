@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { pool } from '../src/persistence/db';
-import { PostgresStockRepository } from '../src/persistence/PostgresStockRepository';
+const { pool } = require('../src/persistence/db');
+const { PostgresStockRepository } = require('../src/persistence/PostgresStockRepository');
 
 describe('PostgresStockRepository (Queries y concurrencia QA-01)', () => {
   const repo = new PostgresStockRepository(pool);
@@ -18,7 +18,7 @@ describe('PostgresStockRepository (Queries y concurrencia QA-01)', () => {
   it('impide saldo negativo ante dos descuentos simultáneos (QA-01)', async () => {
     const lotePrueba = await repo.crearLote({
       productoId: 1,
-      codigoLote: 'TEST-CONCURRENCIA',
+      codigoLote: 'TEST-CONCURRENCIA-JS',
       cantidad: 6,
       fechaVencimiento: '2026-12-30',
       usuarioRol: 'ENCARGADO',
@@ -43,6 +43,6 @@ describe('PostgresStockRepository (Queries y concurrencia QA-01)', () => {
 
     const exitosos = [r1, r2].filter((r) => r !== null);
     expect(exitosos).toHaveLength(1);
-    expect(exitosos[0]?.saldo).toBe(1);
+    expect(exitosos[0].saldo).toBe(1);
   });
 });
