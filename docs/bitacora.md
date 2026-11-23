@@ -1,19 +1,8 @@
-# Bitácora del proyecto
+# Bitácora de Incrementos y Trazabilidad Arquitectónica — StockAlert Web
 
-## Semana 1 — Inicio
-- Fecha:
-- Integrantes presentes:
-- Actividad realizada:
-- Decisiones tomadas:
-- Dudas pendientes:
-- Próximos pasos:
-
-## Semana 5 — Implementación, contrato y pruebas
-- Fecha:
-- Integrantes presentes:
-- Flujos revisados: crear y consultar reservas.
-- Contrato: `docs/openapi.yaml` (OpenAPI 3.0.3), servido en `/openapi.yaml`.
-- Pruebas: unitarias, repositorio y HTTP con `Pool` simulado; ver `tests/`.
-- Decisiones o cambios realizados por el equipo:
-- Hallazgos y dudas pendientes:
-- Próximos pasos:
+| Fecha | Incremento | Drivers / Escenarios atendidos | Componentes / Archivos modificados | Pruebas ejecutadas y resultado | Pendientes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 2026-11-18 | **INC-01:** Esquema relacional PostgreSQL en Docker y datos semilla simulados. | `R-01` (saldo >= 0), `R-04` (PostgreSQL), `R-05` (datos simulados), `QA-06` (lote sin fecha). | `compose.yaml`, `db/init/001_create_stockalert.sql`, `.env.example` | Verificación con `psql \dt` en contenedor `stockalert_db` (puerto `5433`): 4 tablas creadas e inicializadas. | Conectar capa de persistencia en Node.js. |
+| 2026-11-20 | **INC-02:** Implementación de capas `domain` y `persistence` con descuento atómico condicional. | `CU-02` (FEFO), `QA-01` (concurrencia), `T-01` (integridad vs. latencia sin bloqueos largos). | `src/domain/models.js`, `src/domain/errors.js`, `src/persistence/db.js`, `src/persistence/PostgresStockRepository.js` | `tests/PostgresStockRepository.test.js` (Vitest): 2 pruebas aprobadas (consulta semilla y 2 descuentos simultáneos sobre saldo 6 -> 1 éxito y 0 negativos). | Implementar servicios de casos de uso y capa HTTP. |
+| 2026-11-21 | **INC-03:** Lógica pura de clasificación de alertas y casos de uso `CU-01` a `CU-04`. | `CU-01..04`, `R-02` (`INDETERMINADO`), `QA-05` y `T-03` (reglas desacopladas del SQL). | `src/application/EvaluarAlertasService.js`, `RegistrarSalidaService.js`, `RegistrarLoteService.js`, `ConsultarHistorialService.js` | `tests/EvaluarAlertasService.test.js` (Vitest): 2 pruebas aprobadas (`INDETERMINADO` y `POR_VENCER`). | Exponer endpoints REST y control de roles RBAC. |
+| 2026-11-23 | **INC-04:** Capa de presentación Express, control RBAC con auditoría, estandarización a JavaScript puro (`R-04`) y contrato OpenAPI. | `QA-03` (HTTP 403 + auditoría), `T-02` (agilidad en venta vs. control en mermas/umbrales), `QA-06` (HTTP 422). | `src/presentation/rbacMiddleware.js`, `StockAlertController.js`, `stockAlertRoutes.js`, `src/app.js`, `src/server.js`, `docs/openapi.yaml`, `README.md` | `tests/StockAlertApi.test.js` (Supertest + Vitest): 3 pruebas aprobadas (`200`, `403`, `422`). Suite total: 7/7 pruebas en verde. | Evaluar interfaz web ligera opcional para demostración visual. |

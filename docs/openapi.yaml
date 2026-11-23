@@ -1,123 +1,207 @@
 openapi: 3.0.3
 info:
-  title: API didáctica de reservas
+  title: StockAlert Web API
   version: 1.0.0
-  description: Contrato HTTP del ejemplo usado en la semana 5.
+  description: >
+    API REST del monolito en capas para el control de stock crítico y alertas
+    de vencimiento por lote bajo criterio FEFO (Arquitectura de Software - RdA1).
+
 servers:
   - url: http://localhost:3000
+    description: Servidor local de desarrollo
+
 paths:
-  /api/reservations:
+  /health:
     get:
-      operationId: listReservations
-      summary: Consultar las reservas
+      summary: Verificar estado del servicio
       responses:
-        '200':
-          description: Reservas ordenadas por fecha de inicio.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Reservation'
-        '500':
-          $ref: '#/components/responses/InternalError'
+        "200":
+          description: Servicio activo
+
+  /api/alertas:
+    get:
+      summary: Evaluar y listar alertas de vencimiento y stock crítico (CU-01)
+      description: Clasifica cada lote en VENCIDO, POR_VENCER, STOCK_CRITICO, NORMAL o INDETERMINADO (R-02 / QA-06).
+      responses:
+        "200":
+          description: Lista de lotes evaluados con su estado de alerta
+
+  /api/lotes:
     post:
-      operationId: createReservation
-      summary: Crear una reserva
+      summary: Registrar ingreso de un nuevo lote de mercadería (CU-03)
+      parameters:
+        - in: header
+          name: x-user-role
+          schema:
+            type: string
+            enum: [ADMIN, ENCARGADO]
+            default: ENCARGADO
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateReservation'
+              type: object
+              required: [productoId, codigoLote, cantidad]
+              properties:
+                productoId:
+                  type: integer
+                  example: 1
+                codigoLote:
+                  type: string
+                  example: LOTE-LAC-C
+                cantidad:
+                  type: integer
+                  minimum: 1
+                  example: 20
+                fechaVencimiento:
+                  type: string
+                  format: date
+                  nullable: true
+                  example: "2026-12-20"
       responses:
-        '201':
-          description: Reserva creada.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    $ref: '#/components/schemas/Reservation'
-        '400':
-          $ref: '#/components/responses/InvalidInput'
-        '500':
-          $ref: '#/components/responses/InternalError'
-  /health:
+        "201":
+          description: Lote creado e ingreso registrado en movimientos
+        "400":
+          description: Datos faltantes, cantidad <= 0 o formato de fecha inválido
+        "422":
+          description: Lote rechazado porque la fecha de vencimiento ya caducó (QA-06)
+
+  /api/salidas:
+    post:
+      summary: Registrar salida por venta aplicando criterio FEFO (CU-02)
+      description: Descuenta unidades del lote vigente con vencimiento más próximo mediante actualización atómica (R-01 / QA-01).
+      parameters:
+        - in: header
+          name: x-user-role
+          schema:
+            type: string
+            enum: [ADMIN, ENCARGADO]
+            default: ENCARGADO
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productoId, cantidad]
+              properties:
+                productoId:
+                  type: integer
+                  example: 1
+                cantidad:
+                  type: integer
+                  minimum: 1
+                  example: 4
+      responses:
+        "201":
+          description: Salida registrada y saldo actualizado
+        "400":
+          description: Parámetros inválidos
+        "409":
+          description: Stock insuficiente o conflicto de concurrencia (QA-01)
+
+  /api/mermas:
+    post:
+      summary: Registrar baja de inventario por merma (CU-02 / QA-03)
+      description: Operación restringida al rol ADMIN; los intentos no autorizados se registran en auditoría.
+      parameters:
+        - in: header
+          name: x-user-role
+          required: true
+          schema:
+            type: string
+            enum: [ADMIN, ENCARGADO]
+            example: ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [loteId, cantidad, motivo]
+              properties:
+                loteId:
+                  type: integer
+                  example: 1
+                cantidad:
+                  type: integer
+                  minimum: 1
+                  example: 2
+                motivo:
+                  type: string
+                  example: Envase dañado en almacenamiento
+      responses:
+        "201":
+          description: Merma descontada y registrada
+        "400":
+          description: Datos incompletos
+        "403":
+          description: Acceso denegado para rol distinto de ADMIN (QA-03)
+        "409":
+          description: Saldo insuficiente en el lote
+
+  /api/productos/{id}/umbral:
+    put:
+      summary: Configurar stock mínimo y días de preaviso de un producto (QA-03)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - in: header
+          name: x-user-role
+          required: true
+          schema:
+            type: string
+            enum: [ADMIN, ENCARGADO]
+            example: ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stockMinimo, diasPreaviso]
+              properties:
+                stockMinimo:
+                  type: integer
+                  minimum: 0
+                  example: 12
+                diasPreaviso:
+                  type: integer
+                  minimum: 0
+                  example: 10
+      responses:
+        "200":
+          description: Umbrales actualizados
+        "400":
+          description: Valores negativos no permitidos
+        "403":
+          description: Acceso denegado para rol distinto de ADMIN
+        "404":
+          description: Producto no encontrado
+
+  /api/movimientos:
     get:
-      operationId: healthCheck
-      summary: Comprobar que la API responde
+      summary: Consultar historial de ingresos, ventas y mermas (CU-04)
+      parameters:
+        - in: query
+          name: desde
+          schema:
+            type: string
+            format: date
+            example: "2026-11-01"
+        - in: query
+          name: hasta
+          schema:
+            type: string
+            format: date
+            example: "2026-11-30"
       responses:
-        '200':
-          description: Proceso HTTP activo.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [status]
-                properties:
-                  status:
-                    type: string
-                    enum: [ok]
-components:
-  schemas:
-    CreateReservation:
-      type: object
-      additionalProperties: false
-      required: [customerName, resourceName, startsAt, endsAt]
-      properties:
-        customerName:
-          type: string
-          minLength: 1
-          maxLength: 160
-          example: Ana Pérez
-        resourceName:
-          type: string
-          minLength: 1
-          maxLength: 160
-          example: Sala A
-        startsAt:
-          type: string
-          format: date-time
-          example: '2026-11-10T14:00:00-05:00'
-        endsAt:
-          type: string
-          format: date-time
-          example: '2026-11-10T15:00:00-05:00'
-    Reservation:
-      allOf:
-        - $ref: '#/components/schemas/CreateReservation'
-        - type: object
-          required: [id, createdAt]
-          properties:
-            id:
-              type: string
-              format: uuid
-            createdAt:
-              type: string
-              format: date-time
-    ErrorResponse:
-      type: object
-      required: [error]
-      properties:
-        error:
-          type: string
-  responses:
-    InvalidInput:
-      description: Solicitud que no cumple el contrato o las reglas del intervalo.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    InternalError:
-      description: Error interno no expuesto al consumidor.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
+        "200":
+          description: Listado cronológico de movimientos
+        "400":
+          description: Rango de fechas inválido (desde > hasta)
